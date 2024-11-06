@@ -1,0 +1,110 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myservice
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: myservice
+  template:
+    metadata:
+      labels:
+        app: myservice
+      annotations:
+        vault.hashicorp.com/agent-inject: 'true'
+        vault.hashicorp.com/agent-inject-status: 'update'
+        vault.hashicorp.com/role: 'myservice'
+        vault.hashicorp.com/agent-inject-secret-mounted.json: 'secret/data/myservice'
+        vault.hashicorp.com/agent-inject-template-mounted.json: |
+          {{ with secret "secret/data/myservice" -}}
+          {
+            "foo": "{{ .Data.data.foo }}",
+            "rand": "{{ .Data.data.rand }}"
+          }
+          {{- end }}
+    spec:
+      serviceAccountName: myservice-sa
+      containers:
+      - name: myservice
+        image: myservice:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8443
+        volumeMounts:
+        - name: cert-volume
+          mountPath: "/app/certs"
+          readOnly: true
+        - name: ca-volume
+          mountPath: "/app/ca"
+          readOnly: true
+      volumes:
+      - name: cert-volume
+        secret:
+          secretName: myservice-tls
+      - name: ca-volume
+        secret:
+          secretName: myservice-ca
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: myservice
+  namespace: default
+spec:
+  type: ClusterIP
+  selector:
+    app: myservice
+  ports:
+  - protocol: TCP
+    port: 8443
+    targetPort: 8443
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: myservice-sa
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: role-tokenreview-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+- kind: ServiceAccount
+  name: myservice-sa
+  namespace: default
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: myservice-ingress
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/auth-tls-verify-client: "on"
+    nginx.ingress.kubernetes.io/auth-tls-secret: "default/myservice-tls"
+    nginx.ingress.kubernetes.io/auth-tls-verify-depth: "1"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - myservice.example.com
+    secretName: myservice-tls
+  rules:
+  - host: myservice.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: myservice
+            port:
+              number: 8443
