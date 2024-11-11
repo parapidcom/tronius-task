@@ -34,6 +34,12 @@ curl --cacert ./certs/ca.crt \
      https://myservice.example.com/
 ```
 
+### 3. Cleanup
+Once you are done, run the following command to clean up the project:
+```bash
+make down
+```
+
 ---
 
 ## Explanation of Files and Components

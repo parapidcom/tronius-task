@@ -55,11 +55,13 @@ hosts:
 # generate certs and add them to k8s etcd
 secrets: certs
 	@kubectl delete secret myservice-tls -n default || true
-	@kubectl create secret generic myservice-tls \
-		--from-file=client.crt=certs/client.crt \
-		--from-file=client.key=certs/client.key \
+	@kubectl create secret tls myservice-tls \
+		--cert=certs/server.crt \
+		--key=certs/server.key \
+		--namespace=default
+	@kubectl create secret generic myservice-ca \
 		--from-file=ca.crt=certs/ca.crt \
-    --namespace=default
+		--namespace=default
 
 # rebuild image and restart pod to pick it up
 rebuild: build
@@ -75,7 +77,6 @@ clean-k8s:
 	@kubectl delete -f myservice/k8s.yaml || true
 	@kubectl delete -n default deployment/myservice service/myservice ingress/myservice-ingress || true
 	@kubectl delete -n default serviceaccount/myservice-sa || true
-	@kubectl delete serviceaccount myservice-sa -n default || true
 	@kubectl delete clusterrolebinding role-tokenreview-binding || true
 
 # remove helm installations
@@ -95,7 +96,11 @@ up: hosts build secrets helm
 	@echo "waiting nginx to be ready..."
 	@kubectl wait --namespace ingress-nginx \
 		--for=condition=ready pod \
-		--selector=app.kubernetes.io/component=webhook \
+		--selector=app.kubernetes.io/component=controller \
+		--timeout=120s || true
+	@kubectl wait --namespace ingress-nginx \
+		--for=condition=ready pod \
+		--selector=app.kubernetes.io/component=admission-webhook \
 		--timeout=120s || true
 	@$(MAKE) deploy
 	@echo "waiting for myservice pods to be ready..."

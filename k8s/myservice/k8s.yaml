@@ -37,16 +37,10 @@ spec:
         - name: cert-volume
           mountPath: "/app/certs"
           readOnly: true
-        - name: ca-volume
-          mountPath: "/app/ca"
-          readOnly: true
       volumes:
       - name: cert-volume
         secret:
           secretName: myservice-tls
-      - name: ca-volume
-        secret:
-          secretName: myservice-ca
 ---
 apiVersion: v1
 kind: Service
@@ -88,7 +82,7 @@ metadata:
   namespace: default
   annotations:
     nginx.ingress.kubernetes.io/auth-tls-verify-client: "on"
-    nginx.ingress.kubernetes.io/auth-tls-secret: "default/myservice-tls"
+    nginx.ingress.kubernetes.io/auth-tls-secret: "default/myservice-ca"
     nginx.ingress.kubernetes.io/auth-tls-verify-depth: "1"
     nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
 spec:

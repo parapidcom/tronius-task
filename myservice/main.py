@@ -65,7 +65,7 @@ if __name__ == "__main__":
         "main:app",
         host="0.0.0.0",
         port=8443,
-        ssl_keyfile="/app/certs/server.key",
-        ssl_certfile="/app/certs/server.crt",
+        ssl_keyfile="/app/certs/tls.key",
+        ssl_certfile="/app/certs/tls.crt",
         reload=False
     )
